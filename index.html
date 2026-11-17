@@ -1,0 +1,972 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Sign Log">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#f2f2f7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<title>Park Sign Log</title>
+<style>
+/* Layout idea: three levels as plain grouped lists (Parks, then Signs in a park, then one sign).
+   Flat rows with hairline separators, one radius, one accent, system type. No cards, pills or shadows. */
+:root {
+  --bg: #f2f2f7; --row: #ffffff; --sep: #d1d1d6; --ink: #111114; --sec: #66666d; --ter: #c0c0c6;
+  --accent: #1556a8; --on-accent: #ffffff; --good: #1f7a3d; --bad: #c4261d; --warn: #8f5200;
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --radius: 10px;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #000000; --row: #1c1c1e; --sep: #38383a; --ink: #f4f4f6; --sec: #9a9aa2; --ter: #4a4a50;
+    --accent: #5aa9f5; --on-accent: #06182b; --good: #4cd07a; --bad: #ff6b62; --warn: #ffb340;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #000000; --row: #1c1c1e; --sep: #38383a; --ink: #f4f4f6; --sec: #9a9aa2; --ter: #4a4a50;
+  --accent: #5aa9f5; --on-accent: #06182b; --good: #4cd07a; --bad: #ff6b62; --warn: #ffb340;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font); font-size: 17px; line-height: 1.35; -webkit-text-size-adjust: 100%; }
+main { max-width: 600px; margin: 0 auto; padding: env(safe-area-inset-top) max(16px, env(safe-area-inset-right)) max(48px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
+html { -webkit-tap-highlight-color: transparent; }
+a { color: inherit; text-decoration: none; }
+h1 { font-size: 2rem; line-height: 1.12; font-weight: 700; letter-spacing: -0.02em; margin: 6px 0 4px; }
+.lede { margin: 0 0 4px; color: var(--sec); font-size: 1rem; }
+.lede.warn { color: var(--warn); font-weight: 600; }
+.nav { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 52px; padding-top: 6px; }
+.saved { font-size: .85rem; color: var(--sec); font-variant-numeric: tabular-nums; }
+.saved.bad { color: var(--bad); font-weight: 600; }
+.back { display: inline-flex; align-items: center; gap: 6px; color: var(--accent); font-size: 1.06rem; min-height: 44px; padding-right: 16px; }
+.back::before { content: ""; width: 10px; height: 10px; border-left: 2.5px solid currentColor; border-bottom: 2.5px solid currentColor; transform: rotate(45deg); margin-left: 4px; }
+.prog { margin: 8px 0 0; color: var(--sec); font-size: 1rem; font-variant-numeric: tabular-nums; }
+.bar { height: 4px; background: var(--sep); margin-top: 8px; border-radius: 2px; overflow: hidden; }
+.bar > i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .3s ease; }
+.bar.full > i { background: var(--good); }
+.gh { margin: 26px 16px 7px; font-size: .8rem; font-weight: 500; letter-spacing: .03em; text-transform: uppercase; color: var(--sec); }
+.gf { margin: 7px 16px 0; font-size: .86rem; color: var(--sec); }
+.gf.bad { color: var(--bad); font-weight: 500; }
+.gf.warn { color: var(--warn); font-weight: 500; }
+.group { background: var(--row); border-radius: var(--radius); overflow: hidden; }
+.row { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 52px; padding: 10px 16px; width: 100%; background: none; border: 0; font: inherit; color: inherit; text-align: left; }
+.row + .row::before { content: ""; position: absolute; top: 0; left: 16px; right: 0; height: 1px; background: var(--sep); }
+a.row, button.row { cursor: pointer; }
+a.row:active, button.row:active { background: var(--sep); }
+.rl { min-width: 0; display: flex; flex-direction: column; }
+.rt { font-weight: 500; }
+.rs { color: var(--sec); font-size: .9rem; }
+.rr { flex: none; display: flex; align-items: center; gap: 10px; color: var(--sec); font-size: .95rem; font-variant-numeric: tabular-nums; }
+.rr.good { color: var(--good); font-weight: 600; }
+.rr.mid { color: var(--warn); font-weight: 600; }
+.go::after { content: ""; width: 8px; height: 8px; border-right: 2px solid var(--ter); border-top: 2px solid var(--ter); transform: rotate(45deg); flex: none; }
+.row.action { min-height: 60px; justify-content: flex-start; color: var(--accent); font-weight: 600; gap: 12px; }
+.row.action svg { width: 24px; height: 24px; flex: none; }
+.row.action.off { color: var(--ter); cursor: not-allowed; }
+.row.danger { color: var(--bad); }
+.row.danger.armed { font-weight: 600; }
+.photo { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; background: var(--sep); }
+.photo.fresh { animation: land .3s ease-out; }
+@keyframes land { from { opacity: .3; } to { opacity: 1; } }
+.val { color: var(--sec); }
+.val.link { color: var(--accent); font-weight: 500; }
+.ghost { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; font-size: 16px; -webkit-appearance: none; appearance: none; border: 0; background: none; cursor: pointer; }
+.fieldrow { flex-direction: column; align-items: stretch; justify-content: flex-start; gap: 2px; padding-top: 9px; padding-bottom: 9px; }
+.fieldrow label { flex: none; font-size: .8rem; font-weight: 500; color: var(--sec); }
+.input { display: block; width: 100%; min-width: 0; min-height: 30px; box-sizing: border-box; direction: ltr; unicode-bidi: plaintext; text-align: left; font: inherit; font-size: 17px; line-height: 1.3; color: var(--ink); background: none; border: 0; border-radius: 0; padding: 4px 0; margin: 0; -webkit-appearance: none; appearance: none; }
+.input::placeholder { color: var(--ter); text-align: left; opacity: 1; }
+.input:focus { outline: none; }
+.fieldrow:focus-within { background: var(--fill, rgba(120,120,128,.08)); }
+.fieldrow:focus-within label { color: var(--accent); }
+.switch { position: relative; flex: none; width: 51px; height: 31px; }
+.switch input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; z-index: 1; }
+.switch i { position: absolute; inset: 0; border-radius: 99px; background: var(--ter); transition: background .2s; }
+.switch i::after { content: ""; position: absolute; top: 2px; left: 2px; width: 27px; height: 27px; border-radius: 50%; background: #fff; transition: transform .2s; }
+.switch input:checked + i { background: var(--good); }
+.switch input:checked + i::after { transform: translateX(20px); }
+.switch input:focus-visible + i { outline: 3px solid var(--accent); outline-offset: 2px; }
+.alert { display: none; margin: 8px 0 0; padding: 12px 16px; border-radius: var(--radius); background: var(--row); color: var(--bad); font-weight: 500; font-size: .95rem; }
+.alert.show { display: block; }
+.alert.info { color: var(--ink); }
+textarea.paste { width: 100%; min-height: 90px; font: inherit; font-size: 16px; color: var(--ink); background: var(--bg); border: 0; border-radius: var(--radius); padding: 12px 16px; resize: vertical; }
+.sheet .row.action { min-height: 52px; }
+.status { margin: 22px 16px 0; font-size: .85rem; color: var(--sec); }
+a:focus-visible, button:focus-visible { outline: 3px solid var(--accent); outline-offset: -3px; }
+.modal { position: fixed; inset: 0; z-index: 70; background: rgba(0,0,0,.5); display: none; align-items: flex-start; justify-content: center; padding: max(12px, env(safe-area-inset-top)) 12px 12px; overflow-y: auto; }
+.modal .sheet { margin-top: 8vh; }
+.modal.show { display: flex; }
+.sheet { background: var(--row); border-radius: var(--radius); width: 100%; max-width: 560px; padding: 20px 16px 8px; }
+.sheet h2 { margin: 0 0 6px; font-size: 1.15rem; }
+.sheet p { margin: 0 0 14px; color: var(--sec); font-size: .95rem; }
+.sheet .group { background: var(--bg); margin-bottom: 14px; }
+.sbtns { display: grid; gap: 0; margin: 0 -16px; }
+.sbtns button { font: inherit; font-size: 1.05rem; min-height: 52px; border: 0; border-top: 1px solid var(--sep); background: none; color: var(--accent); cursor: pointer; }
+.sbtns button.d { color: var(--bad); font-weight: 600; }
+.sbtns button:disabled { opacity: .5; }
+.stepper { display: flex; align-items: center; gap: 4px; }
+.stepper b { min-width: 34px; text-align: center; font-size: 1.1rem; font-variant-numeric: tabular-nums; }
+.stepper button { width: 44px; height: 44px; border: 0; border-radius: 50%; background: var(--bg); color: var(--accent); font: inherit; font-size: 1.5rem; line-height: 1; cursor: pointer; }
+.stepper button[disabled] { color: var(--ter); cursor: default; }
+button.row[disabled] { opacity: .55; cursor: default; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<main>
+  <div class="alert noprint" id="alert" role="alert"></div>
+  <div id="app"></div>
+</main>
+
+<div class="modal noprint" id="newModal" role="dialog" aria-modal="true" aria-labelledby="nvTitle">
+  <div class="sheet">
+    <h2 id="nvTitle">New event</h2>
+    <p>Each event keeps its own photos and dates. You can switch between events any time.</p>
+    <div class="group"><div class="row fieldrow"><label for="nvName">Name</label><input class="input" id="nvName" type="text" dir="ltr" autocapitalize="words" autocomplete="off" enterkeyhint="done" maxlength="60" placeholder="For example, Snow Village 2026"></div></div>
+    <p class="gf bad" id="nvErr" hidden style="margin:0 0 12px"></p>
+    <div class="sbtns">
+      <button type="button" id="nvGo">Create event</button>
+      <button type="button" id="nvCancel">Cancel</button>
+    </div>
+  </div>
+</div>
+<div class="modal noprint" id="delModal" role="dialog" aria-modal="true" aria-labelledby="delTitle">
+  <div class="sheet">
+    <h2 id="delTitle">Delete this event?</h2>
+    <p>This deletes <b id="delName"></b> and its <b id="delCount">0</b> photos and dates for everyone. It cannot be undone. Save the PDF first if you need a record.</p>
+    <p class="gf bad" id="delErr" hidden style="margin:0 0 12px"></p>
+    <div class="sbtns">
+      <button type="button" class="d" id="delGo">Delete event and photos</button>
+      <button type="button" id="delCancel">Cancel</button>
+    </div>
+  </div>
+</div>
+<input type="file" id="file" accept="image/*" capture="environment" hidden>
+<input type="file" id="restoreFile" accept=".json,application/json" hidden>
+
+<script src="jspdf.min.js"></script>
+<script>
+/* n = signs in the area, lhp = laminate and hole punch before posting */
+var PARKS = [
+  { id: "barnes", name: "Barnes Park", areas: [
+    { name: "Pool Lobby", n: 1 }, { name: "Service Club", n: 2 }, { name: "Gym Office", n: 1 } ] },
+  { id: "garvey", name: "Garvey Ranch Park", areas: [
+    { name: "Baseball Backstops", n: 2, lhp: true }, { name: "Municipal Room Entrance Door", n: 1 }, { name: "Picnic Shelter Notice Board", n: 1 } ] },
+  { id: "sierra", name: "Sierra Vista Park", areas: [
+    { name: "Lobby Doors", n: 2 }, { name: "Baseball Backstop", n: 1, lhp: true } ] },
+  { id: "highlands", name: "Highlands Park", areas: [
+    { name: "Tennis Court Doors", n: 2, lhp: true }, { name: "Picnic Shelter Notice Board", n: 1 } ] },
+  { id: "laloma", name: "La Loma Park", areas: [
+    { name: "Backstops", n: 2, lhp: true } ] },
+  { id: "sequoia", name: "Sequoia Park", areas: [
+    { name: "Backstop", n: 1, lhp: true }, { name: "Basketball Court Fence Door", n: 1, lhp: true }, { name: "Tennis Court Fence Doors", n: 2, lhp: true } ] },
+  { id: "sunnyslopes", name: "Sunnyslopes Park", areas: [
+    { name: "Tennis Court Doors", n: 2, lhp: true }, { name: "Picnic Shelter Notice Board", n: 1 } ] }
+];
+/* A sign id is "park.area.sign", for example "barnes.1.0". Area ids are stable text, so editing the list never moves saved photos. */
+var PLACES_KEY = "mp-signs-places";
+var TOTAL_SIGNS = 0, TOTAL_PHOTOS = 0;
+function rebuildParks() {
+  PARKS.forEach(function (p) {
+    p.areas.forEach(function (a, i) { if (a.id == null) a.id = String(i); });
+    p.signs = [];
+    p.areas.forEach(function (a) { for (var s = 0; s < a.n; s++) p.signs.push(p.id + "." + a.id + "." + s); });
+  });
+  TOTAL_SIGNS = PARKS.reduce(function (t, p) { return t + p.signs.length; }, 0);
+  TOTAL_PHOTOS = TOTAL_SIGNS * 2;
+}
+function placesSave() {
+  try {
+    localStorage.setItem(PLACES_KEY, JSON.stringify(PARKS.map(function (p) {
+      return { id: p.id, name: p.name, areas: p.areas.map(function (a) { return { id: a.id, name: a.name, n: a.n, lhp: !!a.lhp }; }) };
+    })));
+  } catch (e) {}
+}
+function placesLoad() {
+  try {
+    var j = JSON.parse(localStorage.getItem(PLACES_KEY) || "null");
+    var ok = Array.isArray(j) && j.every(function (p) {
+      return p && /^[a-z0-9]+$/.test(p.id) && typeof p.name === "string" && Array.isArray(p.areas) && p.areas.every(function (a) {
+        return a && /^[a-z0-9]+$/.test(String(a.id)) && typeof a.name === "string" && a.n >= 1 && a.n <= 20;
+      });
+    });
+    if (ok) { PARKS.length = 0; j.forEach(function (p) { PARKS.push(p); }); }
+  } catch (e) {}
+}
+function newId(prefix) { return prefix + Date.now().toString(36) + Math.floor(Math.random() * 1296).toString(36); }
+PARKS.forEach(function (p) { p.areas.forEach(function (a, i) { a.id = String(i); }); });
+placesLoad();
+rebuildParks();
+var STEPS = [{ key: "up", label: "Put up" }, { key: "down", label: "Taken down" }];
+
+var events = {};            /* id -> { id, name, started, created, updated, photos, archived } */
+var eventsReady = false;
+var cur = null;             /* id of the event whose photos are loaded */
+var recReady = false;
+var rec = {};               /* current event: "sign_step" -> { sid, key, date, img, by } */
+var mode = "connecting";    /* connecting | local */
+var armed = {}, errors = {}, fresh = {};
+var dirty = false, isAdmin = true;
+var nameOk = false;         /* the person has confirmed their name since opening the app */
+var gateShowing = false;
+var savedAt = null, saveFailed = false;
+var statusText = "Opening\u2026";
+var NAME_KEY = "mp-signs-name";
+
+/* ---------- helpers ---------- */
+function K(sid, key) { return sid + "_" + key; }
+function esc(s) { var d = document.createElement("div"); d.textContent = s == null ? "" : s; return d.innerHTML; }
+function attr(s) { return esc(s).replace(/"/g, "&quot;"); }
+function has(sid, key) { var r = rec[K(sid, key)]; return !!(r && r.img && r.date); }
+function today() {
+  var d = new Date(), m = d.getMonth() + 1, day = d.getDate();
+  return d.getFullYear() + "-" + (m < 10 ? "0" : "") + m + "-" + (day < 10 ? "0" : "") + day;
+}
+function fmtDate(iso) {
+  var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || "");
+  if (!m) return iso || "";
+  return ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][Number(m[2]) - 1] + " " + Number(m[3]) + ", " + m[1];
+}
+function fmtTime(d) {
+  var h = d.getHours(), m = d.getMinutes();
+  return (h % 12 || 12) + ":" + (m < 10 ? "0" : "") + m + " " + (h < 12 ? "AM" : "PM");
+}
+function parkById(id) { return PARKS.filter(function (p) { return p.id === id; })[0]; }
+function parkPhotos(p) { return p.signs.reduce(function (t, s) { return t + (has(s, "up") ? 1 : 0) + (has(s, "down") ? 1 : 0); }, 0); }
+function allPhotos() { return PARKS.reduce(function (t, p) { return t + parkPhotos(p); }, 0); }
+function signInfo(sid) {
+  var parts = sid.split("."), p = parkById(parts[0]);
+  if (!p) return null;
+  var a = p.areas.filter(function (x) { return x.id === parts[1]; })[0];
+  if (!a || Number(parts[2]) >= a.n) return null;
+  return { park: p, area: a, ai: a.id, si: Number(parts[2]) };
+}
+function signStatus(sid) {
+  if (has(sid, "up") && has(sid, "down")) return ["Complete", "good"];
+  if (has(sid, "up")) return ["Posted", "mid"];
+  return ["Not started", ""];
+}
+function signSub(sid) {
+  var up = has(sid, "up") ? "Put up " + fmtDate(rec[K(sid, "up")].date) : "Not put up";
+  var dn = has(sid, "down") ? "Taken down " + fmtDate(rec[K(sid, "down")].date) : (has(sid, "up") ? "Not taken down" : "");
+  return dn ? up + " · " + dn : up;
+}
+function canWrite() { return mode === "shared" || mode === "local"; }
+function savedName() { try { return (localStorage.getItem(NAME_KEY) || "").trim(); } catch (e) { return ""; } }
+function allEvents() { return events; }
+function curEvent() { return cur ? allEvents()[cur] : null; }
+function showAlert(msg, info) { var a = document.getElementById("alert"); a.textContent = msg || ""; a.className = msg ? "alert noprint show" + (info ? " info" : "") : "alert noprint"; if (msg) { try { window.scrollTo(0, 0); } catch (e) {} } }
+function markSaved(ok) { saveFailed = !ok; if (ok) savedAt = new Date(); }
+function savedLine() { return volatileMode ? "Not kept after closing" : saveFailed ? "Not saved" : savedAt ? "Saved " + fmtTime(savedAt) : "Saves automatically"; }
+
+/* ---------- storage: IndexedDB, on this phone ---------- */
+var idb = null;
+var volatileMode = false;   /* true when nothing can be stored: changes are lost when the page closes */
+var mem = { events: {}, steps: {} };
+function idbOpen() {
+  return new Promise(function (res, rej) {
+    var r = indexedDB.open("park-sign-log", 1);
+    r.onupgradeneeded = function () {
+      var d = r.result;
+      d.createObjectStore("events", { keyPath: "id" });
+      d.createObjectStore("steps", { keyPath: "k" }).createIndex("ev", "ev");
+    };
+    r.onsuccess = function () { res(r.result); };
+    r.onerror = function () { rej(r.error); };
+  });
+}
+function idbDo(store, kind, fn) {
+  return new Promise(function (res, rej) {
+    var t = idb.transaction(store, kind), out;
+    try { out = fn(t.objectStore(store)); } catch (e) { rej(e); return; }
+    t.oncomplete = function () { res(out && "result" in out ? out.result : undefined); };
+    t.onerror = t.onabort = function () { rej(t.error); };
+  });
+}
+function evPut(e) { if (!idb) { mem.events[e.id] = JSON.parse(JSON.stringify(e)); return Promise.resolve(); } return idbDo("events", "readwrite", function (s) { s.put(e); }); }
+function evAll() { if (!idb) return Promise.resolve(Object.keys(mem.events).map(function (k) { return mem.events[k]; })); return idbDo("events", "readonly", function (s) { return s.getAll(); }); }
+function stepPut(ev, r) { if (!idb) { mem.steps[ev + "|" + K(r.sid, r.key)] = { ev: ev, sid: r.sid, key: r.key, date: r.date, img: r.img, by: r.by }; return Promise.resolve(); } return idbDo("steps", "readwrite", function (s) { s.put({ k: ev + "|" + K(r.sid, r.key), ev: ev, sid: r.sid, key: r.key, date: r.date, img: r.img, by: r.by }); }); }
+function stepDelete(ev, id) { if (!idb) { delete mem.steps[ev + "|" + id]; return Promise.resolve(); } return idbDo("steps", "readwrite", function (s) { s.delete(ev + "|" + id); }); }
+function stepsLoad(ev) { if (!idb) return Promise.resolve(Object.keys(mem.steps).map(function (k) { return mem.steps[k]; }).filter(function (r) { return r.ev === ev; })); return idbDo("steps", "readonly", function (s) { return s.index("ev").getAll(ev); }); }
+function eventDelete(ev) {
+  if (!idb) { delete mem.events[ev]; Object.keys(mem.steps).forEach(function (k) { if (mem.steps[k].ev === ev) delete mem.steps[k]; }); return Promise.resolve(); }
+  return new Promise(function (res, rej) {
+    var t = idb.transaction(["events", "steps"], "readwrite");
+    t.objectStore("events").delete(ev);
+    var cur2 = t.objectStore("steps").index("ev").openKeyCursor(IDBKeyRange.only(ev));
+    cur2.onsuccess = function () { var c = cur2.result; if (c) { t.objectStore("steps").delete(c.primaryKey); c.continue(); } };
+    t.oncomplete = function () { res(); };
+    t.onerror = t.onabort = function () { rej(t.error); };
+  });
+}
+
+/* ---------- routing ---------- */
+/* #  events list | #ev123 one event | #ev123-p-barnes a park | #ev123-s-barnes-1-0 one sign */
+function route() {
+  var h = location.hash.replace(/^#/, ""), lm = /^loc(?:-([a-z0-9]+))?$/.exec(h);
+  if (lm) return lm[1] ? (parkById(lm[1]) ? { v: "locpark", pid: lm[1] } : { v: "locations" }) : { v: "locations" };
+  var m = /^([a-z0-9]+)(?:-p-([a-z0-9]+)|-s-([a-z0-9]+)-([a-z0-9]+)-(\d+))?$/.exec(h);
+  if (!m) return { v: "events" };
+  var ev = m[1];
+  if (m[2]) return parkById(m[2]) ? { v: "park", ev: ev, pid: m[2] } : { v: "event", ev: ev };
+  if (m[3]) {
+    var sid = m[3] + "." + m[4] + "." + m[5];
+    return signInfo(sid) ? { v: "sign", ev: ev, sid: sid, pid: m[3] } : { v: "event", ev: ev };
+  }
+  return { v: "event", ev: ev };
+}
+var lastRouteKey = "";
+function href(ev, tail) { return "#" + ev + (tail || ""); }
+
+function syncCurrent(ev) {
+  if (ev === cur) return;
+  cur = ev; rec = {}; recReady = false; errors = {}; armed = {};
+  if (!ev) return;
+  stepsLoad(ev).then(function (list) {
+    if (cur !== ev) return;
+    rec = {};
+    list.forEach(function (r) { rec[K(r.sid, r.key)] = { sid: r.sid, key: r.key, date: r.date, img: r.img, by: r.by }; });
+    recReady = true; renderSoon();
+  }).catch(function () { statusText = "Could not open this event."; recReady = true; renderSoon(); });
+}
+
+/* ---------- views ---------- */
+var CAMERA = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>';
+var PLUS = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>';
+
+function progressHtml(done, total) {
+  return '<p class="prog">' + done + ' of ' + total + ' photos added</p><div class="bar' + (done === total ? ' full' : '') + '" role="progressbar" aria-valuemin="0" aria-valuemax="' + total + '" aria-valuenow="' + done + '"><i style="width:' + (done / total * 100) + '%"></i></div>';
+}
+function navHtml(backHref, backLabel) {
+  return '<div class="nav"><a class="back" href="' + backHref + '">' + esc(backLabel) + '</a><span class="saved' + (saveFailed ? ' bad' : '') + '" aria-live="polite">' + esc(savedLine()) + '</span></div>';
+}
+function gateHtml() {
+  var e = curEvent() || {};
+  var h = '<div class="nav"><a class="back" href="#">Events</a><span></span></div><h1>Who is this?</h1>';
+  h += '<p class="lede">Enter your name to open <b>' + esc(e.name || "this event") + '</b>. Your name is saved with every photo you add.</p>';
+  h += '<div class="gh">Your name</div><div class="group"><div class="row fieldrow"><label for="who">Name</label><input class="input" id="who" type="text" dir="ltr" autocapitalize="words" autocorrect="off" spellcheck="false" enterkeyhint="done" autocomplete="name" maxlength="40" placeholder="First and last" value="' + attr(savedName()) + '"></div></div>';
+  h += '<p class="gf bad" id="gateErr" hidden>Enter your first and last name to continue.</p>';
+  h += '<div class="group" style="margin-top:16px"><button type="button" class="row action" data-act="setname">Continue</button></div>';
+  return h;
+}
+function submitName() {
+  var el = document.getElementById("who");
+  var v = el ? el.value.trim() : "";
+  if (v.length < 2) { var g = document.getElementById("gateErr"); if (g) g.hidden = false; if (el) el.focus(); return; }
+  try { localStorage.setItem(NAME_KEY, v); } catch (x) {}
+  nameOk = true; render();
+}
+
+function eventRow(id, e) {
+  var n = id === cur && recReady ? allPhotos() : e.photos;
+  var sub = (n == null ? "" : n + " of " + TOTAL_PHOTOS + " photos · ") + (e.updated ? "Updated " + fmtDate(e.updated) : (e.started ? "Started " + fmtDate(e.started) : "No changes yet"));
+  var done = n === TOTAL_PHOTOS;
+  return '<a class="row" href="' + href(id) + '"><span class="rl"><span class="rt">' + esc(e.name || "Untitled event") + '</span><span class="rs">' + esc(sub) + '</span></span><span class="rr go' + (done ? ' good' : '') + '">' + (done ? 'Complete' : '') + '</span></a>';
+}
+
+function eventsHtml() {
+  var all = allEvents(), ids = Object.keys(all);
+  function byUpdated(a, b) { var x = all[a].updated || all[a].created || "", y = all[b].updated || all[b].created || ""; return x < y ? 1 : x > y ? -1 : 0; }
+  var active = ids.filter(function (i) { return !all[i].archived; }).sort(byUpdated);
+  var arch = ids.filter(function (i) { return all[i].archived; }).sort(byUpdated);
+  var h = '<h1>Park Sign Log</h1><p class="lede">Events</p>';
+  h += '<div class="gh">Events</div><div class="group">';
+  if (canWrite()) h += '<button type="button" class="row action" data-act="newevent">' + PLUS + 'New event</button>';
+  active.forEach(function (id) { h += eventRow(id, all[id]); });
+  if (!active.length) h += '<div class="row"><span class="val">' + (eventsReady ? 'No events yet. Tap New event to start one.' : 'Loading events…') + '</span></div>';
+  h += '</div>';
+  if (arch.length) {
+    h += '<div class="gh">Archived</div><div class="group">';
+    arch.forEach(function (id) { h += eventRow(id, all[id]); });
+    h += '</div>';
+  }
+  h += '<p class="gf">Each event keeps its own photos and dates. You can switch between events at any time. Changes save as you make them.</p>';
+  h += '<div class="gh">Locations</div><div class="group"><a class="row" href="#loc"><span class="rl"><span class="rt">Edit parks and signs</span><span class="rs">' + PARKS.length + (PARKS.length === 1 ? ' park' : ' parks') + ' · ' + TOTAL_SIGNS + (TOTAL_SIGNS === 1 ? ' sign' : ' signs') + '</span></span><span class="rr go"></span></a></div>';
+  h += '<p class="gf">Add a park or a sign spot, or change how many signs a spot needs. It applies to every event.</p>';
+  var lb = ""; try { lb = localStorage.getItem(BACKUP_KEY) || ""; } catch (e) {}
+  h += '<div class="gh">Backup</div><div class="group"><button type="button" class="row" data-act="backup"><span class="rl"><span class="rt">Back up everything</span><span class="rs">' + (lb ? 'Last backup ' + esc(fmtDate(lb)) : 'No backup yet') + '</span></span></button>';
+  h += '<button type="button" class="row" data-act="restore"><span class="rt">Restore from a backup</span></button></div>';
+  h += '<p class="gf">Saves every event, photo and date as one file. Send it to yourself or save it to Files. If the phone is ever lost or reset, restore it here.</p>';
+  h += '<p class="status" aria-live="polite">' + esc(statusText) + '</p>';
+  return h;
+}
+
+function eventHtml() {
+  var e = curEvent();
+  var h = navHtml("#", "Events") + '<h1>' + esc(e.name || "Untitled event") + '</h1>';
+  if (!recReady) return h + '<p class="lede">Loading photos…</p>';
+  h += progressHtml(allPhotos(), TOTAL_PHOTOS);
+  h += '<div class="gh">Parks</div><div class="group">';
+  PARKS.forEach(function (p) {
+    var n = parkPhotos(p), t = p.signs.length * 2, done = n === t;
+    h += '<a class="row" href="' + href(cur, "-p-" + p.id) + '"><span class="rl"><span class="rt">' + esc(p.name) + '</span><span class="rs">' + p.signs.length + ' signs</span></span>';
+    h += '<span class="rr go' + (done ? ' good' : '') + '">' + (done ? 'Complete' : n + ' of ' + t) + '</span></a>';
+  });
+  h += '</div>';
+  h += '<div class="gh">Report</div><div class="group"><button type="button" class="row" data-act="pdf"><span class="rt">Send report</span></button></div>';
+  h += '<p class="gf">Makes a PDF with what was done today and every sign with its photos. In the menu that opens, tap Messages, pick her name, then send.</p>';
+  if (canWrite()) {
+    h += '<div class="gh">Event settings</div><div class="group">';
+    h += '<div class="row fieldrow"><label for="evName">Name</label><input class="input" id="evName" type="text" dir="ltr" autocapitalize="words" autocomplete="off" enterkeyhint="done" maxlength="60" value="' + attr(e.name) + '"></div>';
+    if (isAdmin) h += '<button type="button" class="row" data-act="archive"><span class="rt">' + (e.archived ? 'Restore from archive' : 'Archive this event') + '</span></button>';
+    if (isAdmin) h += '<button type="button" class="row danger" data-act="delete">Delete this event…</button>';
+    h += '</div>';
+    h += '<p class="gf">' + (isAdmin ? 'Archiving moves the event to the bottom of the list and keeps everything. Deleting removes its photos for everyone.' : 'Only the page owner or an editor can archive or delete an event.') + '</p>';
+  }
+  h += '<p class="status" aria-live="polite">' + esc(statusText) + '</p>';
+  return h;
+}
+
+function parkHtml(p) {
+  var n = parkPhotos(p), t = p.signs.length * 2, e = curEvent();
+  var h = navHtml(href(cur), e.name || "Event") + '<h1>' + esc(p.name) + '</h1>' + progressHtml(n, t);
+  p.areas.forEach(function (a) {
+    var ai = a.id;
+    h += '<div class="gh">' + esc(a.name) + ' · ' + a.n + (a.n === 1 ? ' sign' : ' signs') + '</div><div class="group">';
+    for (var s = 0; s < a.n; s++) {
+      var sid = p.id + "." + ai + "." + s, st = signStatus(sid);
+      h += '<a class="row" href="' + href(cur, "-s-" + p.id + "-" + ai + "-" + s) + '"><span class="rl"><span class="rt">Sign ' + (s + 1) + ' of ' + a.n + '</span><span class="rs">' + esc(signSub(sid)) + '</span></span>';
+      h += '<span class="rr go ' + st[1] + '">' + st[0] + '</span></a>';
+    }
+    h += '</div>';
+    if (a.lhp) h += '<p class="gf warn">Laminate and hole punch before posting.</p>';
+  });
+  return h;
+}
+
+function stepGroup(sid, s, label) {
+  var key = K(sid, s.key), r = rec[key], err = errors[key];
+  var h = '<div class="gh">' + s.label + '</div><div class="group">';
+  var foot = "";
+  if (has(sid, s.key)) {
+    h += '<img class="photo' + (fresh[key] ? ' fresh' : '') + '" src="' + r.img + '" alt="' + attr(s.label + ' photo, ' + label) + '">';
+    var min = s.key === "down" && has(sid, "up") ? ' min="' + attr(rec[K(sid, "up")].date) + '"' : '';
+    h += '<label class="row"><span class="rt">Date</span><span class="val' + (canWrite() ? ' link' : '') + '">' + esc(fmtDate(r.date)) + '</span>';
+    h += '<input class="ghost" type="date" data-act="date" data-sid="' + sid + '" data-key="' + s.key + '" value="' + attr(r.date) + '"' + min + (canWrite() ? '' : ' disabled') + ' aria-label="' + s.label + ' date"></label>';
+    if (r.by) h += '<div class="row"><span class="rt">Added by</span><span class="val">' + esc(r.by) + '</span></div>';
+    if (canWrite()) {
+      var armedNow = armed[key];
+      h += '<button type="button" class="row action" data-act="add" data-sid="' + sid + '" data-key="' + s.key + '">' + CAMERA + 'Retake photo</button>';
+      h += '<button type="button" class="row danger' + (armedNow ? ' armed' : '') + '" data-act="remove" data-sid="' + sid + '" data-key="' + s.key + '">' + (armedNow ? 'Tap again to remove' : 'Remove') + '</button>';
+    }
+    if (s.key === "up" && has(sid, "down") && canWrite()) foot = "Removing the put up photo also removes the taken down photo.";
+  } else if (s.key === "down" && !has(sid, "up")) {
+    h += '<div class="row action off">' + CAMERA + 'Add photo</div>';
+    foot = "Add the put up photo first.";
+  } else if (!canWrite()) {
+    h += '<div class="row"><span class="val">No photo yet</span></div>';
+  } else {
+    h += '<button type="button" class="row action" data-act="add" data-sid="' + sid + '" data-key="' + s.key + '">' + CAMERA + 'Add photo</button>';
+    foot = "A photo is required. The date fills in as today.";
+  }
+  h += '</div>';
+  if (err) h += '<p class="gf bad">' + esc(err) + '</p>';
+  else if (foot) h += '<p class="gf">' + esc(foot) + '</p>';
+  return h;
+}
+
+function signHtml(sid) {
+  var info = signInfo(sid), p = info.park, a = info.area;
+  var label = a.name + (a.n > 1 ? ", sign " + (info.si + 1) : "");
+  var h = navHtml(href(cur, "-p-" + p.id), p.name);
+  h += '<h1>' + esc(a.name) + '</h1><p class="lede">Sign ' + (info.si + 1) + ' of ' + a.n + ' · ' + esc(p.name) + '</p>';
+  if (a.lhp) h += '<p class="lede warn">Laminate and hole punch before posting.</p>';
+  STEPS.forEach(function (s) { h += stepGroup(sid, s, label); });
+  return h;
+}
+
+function fieldRow(id, label, field, pid, aid, val, max) {
+  return '<div class="row fieldrow"><label for="' + id + '">' + label + '</label><input class="input" id="' + id + '" type="text" dir="ltr" autocapitalize="words" autocomplete="off" enterkeyhint="done" maxlength="' + max + '" data-field="' + field + '" data-pid="' + pid + '"' + (aid != null ? ' data-aid="' + aid + '"' : '') + ' value="' + attr(val) + '"></div>';
+}
+function locationsHtml() {
+  var h = navHtml("#", "Events") + '<h1>Locations</h1><p class="lede">' + PARKS.length + (PARKS.length === 1 ? ' park' : ' parks') + ' · ' + TOTAL_SIGNS + ' signs</p>';
+  h += '<div class="gh">Parks</div><div class="group">';
+  PARKS.forEach(function (p) {
+    h += '<a class="row" href="#loc-' + p.id + '"><span class="rl"><span class="rt">' + esc(p.name) + '</span><span class="rs">' + p.areas.length + (p.areas.length === 1 ? ' spot' : ' spots') + ' · ' + p.signs.length + (p.signs.length === 1 ? ' sign' : ' signs') + '</span></span><span class="rr go"></span></a>';
+  });
+  h += '<button type="button" class="row action" data-act="addpark">' + PLUS + 'Add a park</button></div>';
+  h += '<p class="gf">Tap a park to change its spots. Events you already started keep their photos.</p>';
+  return h;
+}
+function locParkHtml(p) {
+  var h = navHtml("#loc", "Locations") + '<h1>' + esc(p.name) + '</h1><p class="lede">' + p.signs.length + (p.signs.length === 1 ? ' sign' : ' signs') + '</p>';
+  h += '<div class="gh">Park name</div><div class="group">' + fieldRow("pname", "Name", "pname", p.id, null, p.name, 60) + '</div>';
+  p.areas.forEach(function (a) {
+    var rk = "rm" + p.id + a.id;
+    h += '<div class="gh">' + esc(a.name) + '</div><div class="group">';
+    h += fieldRow("an-" + a.id, "Spot name", "aname", p.id, a.id, a.name, 60);
+    h += '<div class="row"><span class="rt">Signs needed</span><span class="stepper"><button type="button" data-act="dec" data-pid="' + p.id + '" data-aid="' + a.id + '" aria-label="Fewer signs"' + (a.n <= 1 ? ' disabled' : '') + '>−</button><b>' + a.n + '</b><button type="button" data-act="inc" data-pid="' + p.id + '" data-aid="' + a.id + '" aria-label="More signs"' + (a.n >= 20 ? ' disabled' : '') + '>+</button></span></div>';
+    h += '<label class="row"><span class="rt">Laminate and hole punch</span><span class="switch"><input type="checkbox" data-field="lhp" data-pid="' + p.id + '" data-aid="' + a.id + '"' + (a.lhp ? ' checked' : '') + ' aria-label="Laminate and hole punch"><i></i></span></label>';
+    h += '<button type="button" class="row danger' + (armed[rk] ? ' armed' : '') + '" data-act="removearea" data-pid="' + p.id + '" data-aid="' + a.id + '">' + (armed[rk] ? 'Tap again to remove' : 'Remove this spot') + '</button></div>';
+  });
+  h += '<div class="group" style="margin-top:20px"><button type="button" class="row action" data-act="addarea" data-pid="' + p.id + '">' + PLUS + 'Add a spot</button></div>';
+  h += '<p class="gf">Removing or lowering a number hides those signs in reports. Photos already saved stay on the phone.</p>';
+  var pk = "rm" + p.id;
+  h += '<div class="group" style="margin-top:26px"><button type="button" class="row danger' + (armed[pk] ? ' armed' : '') + '" data-act="removepark" data-pid="' + p.id + '">' + (armed[pk] ? 'Tap again to remove the park' : 'Remove this park') + '</button></div>';
+  return h;
+}
+function placesChanged() { rebuildParks(); placesSave(); render(); }
+function focusLast(sel) { setTimeout(function () { var l = document.querySelectorAll(sel), i = l[l.length - 1]; if (i) { try { i.focus(); i.select(); } catch (e) {} } }, 60); }
+function placeAction(act, b) {
+  var p = parkById(b.getAttribute("data-pid")), aid = b.getAttribute("data-aid");
+  var a = p && aid != null ? p.areas.filter(function (x) { return x.id === aid; })[0] : null;
+  if (act === "addpark") {
+    var np = { id: newId("p"), name: "New park", areas: [{ id: newId("a"), name: "New spot", n: 1, lhp: false }] };
+    PARKS.push(np); rebuildParks(); placesSave(); location.hash = "#loc-" + np.id; setTimeout(function () { var i = document.getElementById("pname"); if (i) { try { i.focus(); i.select(); } catch (e) {} } }, 80);
+  } else if (!p) { return; }
+  else if (act === "addarea") { p.areas.push({ id: newId("a"), name: "New spot", n: 1, lhp: false }); placesChanged(); focusLast('input[data-field="aname"]'); }
+  else if (act === "inc" && a) { if (a.n < 20) { a.n++; placesChanged(); } }
+  else if (act === "dec" && a) { if (a.n > 1) { a.n--; placesChanged(); } }
+  else if (act === "removearea" || act === "removepark") {
+    var k = "rm" + p.id + (act === "removearea" ? aid : "");
+    if (armed[k]) {
+      delete armed[k];
+      if (act === "removearea") p.areas = p.areas.filter(function (x) { return x.id !== aid; });
+      else { PARKS.splice(PARKS.indexOf(p), 1); location.hash = "#loc"; }
+      placesChanged();
+    } else { armed[k] = true; render(); setTimeout(function () { if (armed[k]) { delete armed[k]; render(); } }, 4000); }
+  }
+}
+function placeField(t) {
+  var f = t.getAttribute("data-field"), p = parkById(t.getAttribute("data-pid")), aid = t.getAttribute("data-aid");
+  if (!p) return;
+  var a = aid != null ? p.areas.filter(function (x) { return x.id === aid; })[0] : null;
+  if (f === "pname") { var v = t.value.trim(); if (v) p.name = v; }
+  else if (f === "aname" && a) { var w = t.value.trim(); if (w) a.name = w; }
+  else if (f === "lhp" && a) a.lhp = t.checked;
+  placesChanged();
+}
+
+function render() {
+  dirty = false;
+  var r = route(), all = allEvents(), view = "events", key;
+  if (r.ev && all[r.ev]) { syncCurrent(r.ev); view = r.v; }
+  else { if (!r.ev || eventsReady) syncCurrent(null); if (r.ev && !eventsReady) view = "loading"; else if (!r.ev && (r.v === "locations" || r.v === "locpark")) view = r.v; }
+  key = view + (r.ev || "") + (r.sid || r.pid || "");
+  var app = document.getElementById("app"), y = window.scrollY, html;
+  gateShowing = !!cur && (view === "event" || view === "park" || view === "sign") && !nameOk && canWrite();
+  if (view === "loading") html = '<h1>Park Sign Log</h1><p class="lede">Loading…</p>';
+  else if (gateShowing) html = gateHtml();
+  else if (view === "locations") html = locationsHtml();
+  else if (view === "locpark") html = locParkHtml(parkById(r.pid));
+  else if (view === "sign") html = signHtml(r.sid);
+  else if (view === "park") html = parkHtml(parkById(r.pid));
+  else if (view === "event") html = eventHtml();
+  else html = eventsHtml();
+  app.innerHTML = html;
+  if (key !== lastRouteKey) { window.scrollTo(0, 0); lastRouteKey = key; } else window.scrollTo(0, y);
+  if (gateShowing) setTimeout(function () { var w = document.getElementById("who"); if (w && !savedName()) w.focus(); }, 50);
+}
+function renderSoon() {
+  var a = document.activeElement;
+  if (a && (a.tagName === "INPUT" || a.tagName === "TEXTAREA")) { dirty = true; return; }
+  render();
+}
+window.addEventListener("hashchange", function () { armed = {}; render(); });
+
+/* ---------- PDF ---------- */
+/* ---------- backup and restore ---------- */
+var BACKUP_KEY = "mp-signs-lastbackup";
+function placesPlain() {
+  return PARKS.map(function (p) { return { id: p.id, name: p.name, areas: p.areas.map(function (a) { return { id: a.id, name: a.name, n: a.n, lhp: !!a.lhp }; }) }; });
+}
+async function backupAll(btn) {
+  var label = btn && btn.querySelector(".rt");
+  if (btn) { btn.disabled = true; if (label) label.textContent = "Making backup…"; }
+  showAlert("");
+  try {
+    var evs = await evAll(), out = [];
+    for (var i = 0; i < evs.length; i++) out.push({ event: evs[i], steps: await stepsLoad(evs[i].id) });
+    var data = { app: "park-sign-log", version: 1, saved: new Date().toISOString(), places: placesPlain(), events: out };
+    var fname = "Park-Sign-Log-backup-" + today() + ".json";
+    var blob = new Blob([JSON.stringify(data)], { type: "application/json" }), file = new File([blob], fname, { type: "application/json" });
+    window.__lastBackup = { name: fname, bytes: blob.size, blob: blob };
+    var done = false;
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try { await navigator.share({ files: [file], title: "Park Sign Log backup" }); done = true; }
+      catch (er) { if (er && er.name === "AbortError") return; }
+    }
+    if (!done) {
+      var url = URL.createObjectURL(blob), l = document.createElement("a");
+      l.href = url; l.download = fname; document.body.appendChild(l); l.click(); l.remove();
+      setTimeout(function () { URL.revokeObjectURL(url); }, 60000);
+    }
+    try { localStorage.setItem(BACKUP_KEY, today()); } catch (e) {}
+    render();
+  } catch (err) {
+    window.__bkErr = String(err && err.stack || err);
+    showAlert("Could not make the backup. Try again, and if it keeps failing, close and reopen the app.");
+  } finally {
+    if (btn && document.body.contains(btn)) { btn.disabled = false; if (label) label.textContent = "Back up everything"; }
+  }
+}
+async function restoreFrom(file) {
+  showAlert("");
+  try {
+    var d = JSON.parse(await file.text());
+    if (!d || d.app !== "park-sign-log" || !Array.isArray(d.events)) throw new Error("not a backup");
+    (d.places || []).forEach(function (bp) {
+      if (!bp || !/^[a-z0-9]+$/.test(bp.id) || !Array.isArray(bp.areas)) return;
+      var p = parkById(bp.id);
+      if (!p) { PARKS.push({ id: bp.id, name: String(bp.name || "Park"), areas: [] }); p = PARKS[PARKS.length - 1]; }
+      bp.areas.forEach(function (ba) {
+        if (!ba || !/^[a-z0-9]+$/.test(String(ba.id))) return;
+        var a = p.areas.filter(function (x) { return x.id === String(ba.id); })[0];
+        if (!a) p.areas.push({ id: String(ba.id), name: String(ba.name || "Spot"), n: Math.min(20, Math.max(1, Number(ba.n) || 1)), lhp: !!ba.lhp });
+        else a.n = Math.max(a.n, Math.min(20, Number(ba.n) || 1));
+      });
+    });
+    rebuildParks(); placesSave();
+    var ne = 0, np = 0;
+    for (var i = 0; i < d.events.length; i++) {
+      var it = d.events[i], e = it && it.event;
+      if (!e || !/^[a-z0-9]+$/.test(e.id)) continue;
+      await evPut(e); events[e.id] = e; ne++;
+      var st = it.steps || [];
+      for (var j = 0; j < st.length; j++) { if (st[j] && st[j].sid && st[j].key && st[j].img) { await stepPut(e.id, st[j]); np++; } }
+    }
+    cur = null; lastRouteKey = null; location.hash = "#"; render();
+    showAlert("Restored " + ne + (ne === 1 ? " event" : " events") + " and " + np + (np === 1 ? " photo." : " photos."), true);
+  } catch (err) {
+    window.__rsErr = String(err && err.stack || err);
+    showAlert("That file is not a Park Sign Log backup, or it could not be read.");
+  }
+}
+
+function loadImg(src) { return new Promise(function (res) { var i = new Image(); i.onload = function () { res(i); }; i.onerror = function () { res(null); }; i.src = src; }); }
+async function makePdf(btn) {
+  var J = window.jspdf && window.jspdf.jsPDF;
+  if (!J) { showAlert("The PDF maker did not load. Close and reopen the app, then try again."); return; }
+  var label = btn && btn.querySelector(".rt");
+  if (btn) { btn.disabled = true; if (label) label.textContent = "Making PDF…"; }
+  showAlert("");
+  try {
+    var e = curEvent() || {}, name = e.name || "Park Sign Log";
+    var doc = new J({ unit: "pt", format: "letter" });
+    var W = 612, H = 792, M = 40, CW = W - 2 * M, GAP = 16, BW = (CW - GAP) / 2, BH = 190, y = M;
+    function need(h) { if (y + h > H - M) { doc.addPage(); y = M; } }
+    doc.setFont("helvetica", "bold"); doc.setFontSize(20); doc.setTextColor(0);
+    var t = doc.splitTextToSize(name, CW); doc.text(t, M, y + 16); y += 16 + (t.length - 1) * 24;
+    doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.setTextColor(90);
+    doc.text("Created " + fmtDate(today()) + "  ·  " + allPhotos() + " of " + TOTAL_PHOTOS + " photos added", M, y + 18); y += 34;
+
+    /* what was done today */
+    var tdy = today(), upT = {}, dnT = {}, upAll = 0, dnAll = 0, nUp = 0, nDn = 0;
+    PARKS.forEach(function (pk) {
+      pk.signs.forEach(function (sd) {
+        var inf = signInfo(sd), lb = inf.area.name + (inf.area.n > 1 ? " (" + (inf.si + 1) + " of " + inf.area.n + ")" : "");
+        if (has(sd, "up")) { upAll++; if (rec[K(sd, "up")].date === tdy) { nUp++; (upT[pk.id] = upT[pk.id] || []).push(lb); } }
+        if (has(sd, "down")) { dnAll++; if (rec[K(sd, "down")].date === tdy) { nDn++; (dnT[pk.id] = dnT[pk.id] || []).push(lb); } }
+      });
+    });
+    var lines = [];
+    PARKS.forEach(function (pk) {
+      if (upT[pk.id]) lines.push([pk.name + " – put up " + upT[pk.id].length, upT[pk.id].join(", ")]);
+      if (dnT[pk.id]) lines.push([pk.name + " – taken down " + dnT[pk.id].length, dnT[pk.id].join(", ")]);
+    });
+    doc.setFont("helvetica", "bold"); doc.setFontSize(12); doc.setTextColor(0);
+    doc.text("Done today, " + fmtDate(tdy), M, y + 10); y += 20;
+    doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.setTextColor(40);
+    doc.text(nUp + " put up, " + nDn + " taken down", M, y + 8); y += 16;
+    if (!lines.length) { doc.setTextColor(110); doc.text("Nothing was added today.", M, y + 8); y += 16; }
+    lines.forEach(function (ln) {
+      var wr = doc.splitTextToSize(ln[1], CW - 12);
+      need(14 + wr.length * 12 + 4);
+      doc.setFont("helvetica", "bold"); doc.setFontSize(10); doc.setTextColor(0); doc.text(ln[0], M, y + 8); y += 14;
+      doc.setFont("helvetica", "normal"); doc.setTextColor(70); doc.text(wr, M + 12, y + 6); y += wr.length * 12 + 4;
+    });
+    need(30); doc.setTextColor(40); doc.setFontSize(10);
+    doc.text("Overall: " + upAll + " of " + TOTAL_SIGNS + " signs put up, " + dnAll + " of " + TOTAL_SIGNS + " taken down.", M, y + 10); y += 22;
+    doc.setDrawColor(200); doc.setLineWidth(.5); doc.line(M, y, W - M, y); y += 18;
+    for (var pi = 0; pi < PARKS.length; pi++) {
+      var p = PARKS[pi], first = true;
+      for (var ai = 0; ai < p.areas.length; ai++) {
+        var a = p.areas[ai];
+        for (var si = 0; si < a.n; si++) {
+          var sid = p.id + "." + a.id + "." + si;
+          need((first ? 34 : 0) + 26 + BH + 30);
+          if (first) {
+            doc.setFont("helvetica", "bold"); doc.setFontSize(14); doc.setTextColor(0); doc.text(p.name, M, y + 12);
+            doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.setTextColor(90);
+            doc.text(parkPhotos(p) + " of " + p.signs.length * 2 + " photos", W - M, y + 12, { align: "right" });
+            doc.setDrawColor(0); doc.setLineWidth(1.2); doc.line(M, y + 18, W - M, y + 18); y += 34; first = false;
+          }
+          doc.setFont("helvetica", "bold"); doc.setFontSize(11); doc.setTextColor(0);
+          var ttl = a.name + ", sign " + (si + 1) + " of " + a.n; doc.text(ttl, M, y + 10);
+          if (a.lhp) { var tw = doc.getTextWidth(ttl); doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.setTextColor(176, 96, 0); doc.text("Laminate and hole punch", M + tw + 8, y + 10); }
+          y += 18;
+          for (var ci = 0; ci < STEPS.length; ci++) {
+            var st = STEPS[ci], x = M + ci * (BW + GAP), r = rec[K(sid, st.key)];
+            doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(110); doc.text(st.label.toUpperCase(), x, y + 7);
+            var top = y + 12;
+            if (has(sid, st.key)) {
+              var img = await loadImg(r.img);
+              if (img) {
+                var sc = Math.min(BW / img.naturalWidth, BH / img.naturalHeight), w = img.naturalWidth * sc, h = img.naturalHeight * sc;
+                doc.addImage(r.img, "JPEG", x + (BW - w) / 2, top + (BH - h) / 2, w, h);
+              }
+              doc.setDrawColor(190); doc.setLineWidth(.5); doc.setLineDashPattern([], 0); doc.rect(x, top, BW, BH);
+              doc.setFontSize(9); doc.setTextColor(0);
+              doc.text(fmtDate(r.date) + (r.by ? "  ·  " + r.by : ""), x, top + BH + 12);
+            } else {
+              doc.setDrawColor(170); doc.setLineWidth(.5); doc.setLineDashPattern([3, 3], 0); doc.rect(x, top, BW, BH); doc.setLineDashPattern([], 0);
+              doc.setFontSize(10); doc.setTextColor(120); doc.text("No photo", x + BW / 2, top + BH / 2, { align: "center" });
+            }
+          }
+          y += 12 + BH + 22;
+        }
+      }
+      y += 6;
+    }
+    var n = doc.getNumberOfPages();
+    for (var pg = 1; pg <= n; pg++) { doc.setPage(pg); doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(120); doc.text(name + "  ·  Page " + pg + " of " + n, W / 2, H - 20, { align: "center" }); }
+    var fname = (name.replace(/[^A-Za-z0-9]+/g, "-").replace(/^-|-$/g, "") || "Park-Sign-Log") + ".pdf";
+    var blob = doc.output("blob"), file = new File([blob], fname, { type: "application/pdf" });
+    window.__lastPdf = { name: fname, bytes: blob.size, pages: n, blob: blob };
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try { await navigator.share({ files: [file], title: name, text: name + " report, " + fmtDate(today()) }); return; }
+      catch (er) { if (er && er.name === "AbortError") return; }
+    }
+    var url = URL.createObjectURL(blob), l = document.createElement("a");
+    l.href = url; l.download = fname; document.body.appendChild(l); l.click(); l.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 60000);
+  } catch (err) {
+    window.__pdfErr = String(err && err.stack || err);
+    showAlert("Could not make the PDF. Try again, and if it keeps failing, close and reopen the app.");
+  } finally {
+    if (btn) { btn.disabled = false; if (label) label.textContent = "Send report"; }
+  }
+}
+
+/* ---------- saving ---------- */
+var touching = false, touchAgain = false;
+async function touch() {  /* keeps the photo count and last-updated date on the event list current */
+  var e = cur && events[cur];
+  if (!e) return;
+  e.photos = allPhotos(); e.updated = new Date().toISOString();
+  try { await evPut(e); } catch (x) {}
+}
+
+var fileInput = document.getElementById("file");
+var pending = null;
+
+function startAdd(sid, key) {
+  if (!canWrite()) return;
+  var who = document.getElementById("who");
+  var name = who ? who.value.trim() : savedName();
+  if (!name) {
+    var n = document.getElementById("whoNote");
+    if (n) { n.className = "gf bad"; n.textContent = "Enter your name before adding a photo. Your name is saved with every photo you add."; }
+    if (who) { who.scrollIntoView({ block: "center", behavior: "smooth" }); who.focus(); }
+    return;
+  }
+  try { localStorage.setItem(NAME_KEY, name); } catch (e) {}
+  pending = { sid: sid, key: key, by: name, ev: cur };
+  fileInput.value = "";
+  fileInput.click();
+}
+
+function shrink(img) {
+  var sizes = [[640, 0.65], [520, 0.55], [400, 0.5]], out = "";
+  for (var i = 0; i < sizes.length; i++) {
+    var sc = Math.min(1, sizes[i][0] / Math.max(img.width, img.height));
+    var c = document.createElement("canvas");
+    c.width = Math.round(img.width * sc); c.height = Math.round(img.height * sc);
+    c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+    out = c.toDataURL("image/jpeg", sizes[i][1]);
+    if (out.length < 170000) break;
+  }
+  return out;
+}
+
+fileInput.addEventListener("change", function () {
+  var f = fileInput.files && fileInput.files[0];
+  if (!f || !pending) return;
+  var job = pending; pending = null;
+  var url = URL.createObjectURL(f), img = new Image();
+  img.onload = function () { URL.revokeObjectURL(url); saveRecord(job, shrink(img)); };
+  img.onerror = function () {
+    URL.revokeObjectURL(url);
+    errors[K(job.sid, job.key)] = "That file could not be read as a photo. Try again.";
+    render();
+  };
+  img.src = url;
+});
+
+function writeError(e) {
+  markSaved(false);
+  var name = e && e.name;
+  showAlert(name === "QuotaExceededError" ? "This phone is out of storage. Remove some photos or delete an old event, then try again." : "Could not save. Close and reopen the app, then try again.");
+  render();
+}
+
+async function saveRecord(job, dataUrl) {
+  if (job.ev !== cur) { showAlert("You changed events before the photo finished. Add it again."); return; }
+  var sid = job.sid, key = job.key, id = K(sid, key), old = rec[id];
+  var date = old && old.date ? old.date : today();
+  if (key === "down" && has(sid, "up") && date < rec[K(sid, "up")].date) date = rec[K(sid, "up")].date;
+  var r = { sid: sid, key: key, date: date, img: dataUrl, by: job.by };
+  delete errors[id]; showAlert("");
+  try { await stepPut(cur, r); } catch (e) { writeError(e); return; }
+  rec[id] = r;
+  fresh[id] = true; setTimeout(function () { delete fresh[id]; }, 800);
+  markSaved(true); touch(); render();
+}
+
+async function removeRecord(sid, key) {
+  var ids = [K(sid, key)];
+  if (key === "up") ids.push(K(sid, "down"));
+  showAlert("");
+  for (var i = 0; i < ids.length; i++) {
+    if (!rec[ids[i]]) continue;
+    try { await stepDelete(cur, ids[i]); } catch (e) { writeError(e); return; }
+    delete rec[ids[i]];
+  }
+  markSaved(true); touch(); render();
+}
+
+async function changeDate(sid, key, v) {
+  var id = K(sid, key), r = rec[id];
+  if (!r) return;
+  delete errors[id];
+  if (!v) { errors[id] = "Enter a date."; render(); return; }
+  if (key === "down" && has(sid, "up") && v < rec[K(sid, "up")].date) { errors[id] = "The taken down date cannot be before the put up date."; render(); return; }
+  if (key === "up" && has(sid, "down") && v > rec[K(sid, "down")].date) { errors[id] = "The put up date cannot be after the taken down date."; render(); return; }
+  var next = { sid: r.sid, key: r.key, date: v, img: r.img, by: r.by };
+  try { await stepPut(cur, next); } catch (e) { writeError(e); return; }
+  rec[id] = next;
+  markSaved(true); touch(); render();
+}
+
+/* ---------- events: create, rename, archive, delete ---------- */
+function modal(id, on) { document.getElementById(id).className = "modal noprint" + (on ? " show" : ""); }
+
+function openNew() {
+  document.getElementById("nvName").value = "";
+  document.getElementById("nvErr").hidden = true;
+  modal("newModal", true);
+  document.getElementById("nvName").focus();
+}
+async function doCreate() {
+  var err = document.getElementById("nvErr"), go = document.getElementById("nvGo");
+  var name = document.getElementById("nvName").value.trim();
+  if (!name) { err.textContent = "Enter a name for the event."; err.hidden = false; return; }
+  go.disabled = true; err.hidden = true;
+  var id = "ev" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+  var iso = new Date().toISOString();
+  var e = { id: id, name: name, started: today(), created: iso, updated: iso, photos: 0, archived: false };
+  try { await evPut(e); } catch (x) { err.textContent = "Could not create the event. Close and reopen the app, then try again."; err.hidden = false; go.disabled = false; return; }
+  events[id] = e;
+  markSaved(true);
+  go.disabled = false; modal("newModal", false);
+  location.hash = id; render();
+}
+
+async function renameEvent(name) {
+  var e = curEvent();
+  if (!e || !name || name === e.name) return;
+  var next = Object.assign({}, e, { name: name });
+  try { await evPut(next); } catch (x) { writeError(x); return; }
+  events[cur] = next;
+  markSaved(true); render();
+}
+
+async function toggleArchive() {
+  var e = curEvent();
+  if (!e) return;
+  var next = Object.assign({}, e, { archived: !e.archived });
+  try { await evPut(next); } catch (x) { writeError(x); return; }
+  events[cur] = next;
+  markSaved(true);
+  if (next.archived) location.hash = "";
+  render();
+}
+
+function openDelete() {
+  var e = curEvent();
+  document.getElementById("delName").textContent = e ? e.name : "";
+  document.getElementById("delCount").textContent = Object.keys(rec).length;
+  document.getElementById("delErr").hidden = true;
+  modal("delModal", true);
+  document.getElementById("delCancel").focus();
+}
+async function doDelete() {
+  var go = document.getElementById("delGo"), err = document.getElementById("delErr"), id = cur;
+  go.disabled = true; err.hidden = true;
+  try { await eventDelete(id); }
+  catch (e) { err.textContent = "Could not delete the event. Close and reopen the app, then try again."; err.hidden = false; go.disabled = false; return; }
+  delete events[id];
+  go.disabled = false; modal("delModal", false);
+  syncCurrent(null); location.hash = ""; render();
+}
+
+/* ---------- events ---------- */
+document.addEventListener("click", function (e) {
+  var b = e.target.closest("[data-act]");
+  if (!b) return;
+  var act = b.getAttribute("data-act"), sid = b.getAttribute("data-sid"), key = b.getAttribute("data-key");
+  if (act === "add") startAdd(sid, key);
+  else if (act === "remove") {
+    var id = K(sid, key);
+    if (armed[id]) { delete armed[id]; removeRecord(sid, key); }
+    else { armed[id] = true; render(); setTimeout(function () { if (armed[id]) { delete armed[id]; render(); } }, 4000); }
+  } else if (act === "newevent") openNew();
+  else if (act === "archive") toggleArchive();
+  else if (act === "delete") openDelete();
+  else if (act === "setname") submitName();
+  else if (act === "pdf") makePdf(b);
+  else if (act === "backup") backupAll(b);
+  else if (act === "restore") { var rf = document.getElementById("restoreFile"); if (rf) { rf.value = ""; rf.click(); } }
+  else if (["addpark", "addarea", "inc", "dec", "removearea", "removepark"].indexOf(act) >= 0) placeAction(act, b);
+});
+document.addEventListener("change", function (e) {
+  var t = e.target;
+  if (t.id === "who") {
+    if (gateShowing) return;
+    try { localStorage.setItem(NAME_KEY, t.value.trim()); } catch (x) {}
+    dirty = false; render();
+  }
+  else if (t.id === "evName") renameEvent(t.value.trim());
+  else if (t.getAttribute && t.getAttribute("data-field")) placeField(t);
+  else if (t.getAttribute && t.getAttribute("data-act") === "date") changeDate(t.getAttribute("data-sid"), t.getAttribute("data-key"), t.value);
+});
+document.addEventListener("focusout", function () { if (dirty) setTimeout(function () { var a = document.activeElement; if (dirty && !(a && (a.tagName === "INPUT" || a.tagName === "TEXTAREA"))) render(); }, 200); });
+document.getElementById("restoreFile").addEventListener("change", function (e) { var f = e.target.files && e.target.files[0]; if (f) restoreFrom(f); });
+document.getElementById("nvCancel").addEventListener("click", function () { modal("newModal", false); });
+document.getElementById("nvGo").addEventListener("click", doCreate);
+document.getElementById("nvName").addEventListener("keydown", function (e) { if (e.key === "Enter") doCreate(); });
+document.getElementById("delCancel").addEventListener("click", function () { modal("delModal", false); });
+document.getElementById("delGo").addEventListener("click", doDelete);
+document.addEventListener("keydown", function (e) { if (e.key === "Enter" && gateShowing && e.target.id === "who") { e.preventDefault(); submitName(); } });
+document.addEventListener("keydown", function (e) { if (e.key === "Escape") { modal("newModal", false); modal("delModal", false); } });
+
+/* ---------- start up ---------- */
+(async function start() {
+  render();
+  try {
+    if (!window.indexedDB) throw new Error("no indexedDB");
+    idb = await idbOpen();
+    statusText = "Everything is saved on this phone and works without internet.";
+    try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) {}
+  } catch (e) {
+    idb = null; volatileMode = true;
+    statusText = "This page cannot store anything here, so changes are lost when you close it. Install the app on the phone to keep your work.";
+  }
+  try { (await evAll()).forEach(function (e) { events[e.id] = e; }); } catch (e) {}
+  mode = "local"; eventsReady = true;
+  render();
+  if ("serviceWorker" in navigator && /^https:|^http:\/\/localhost/.test(location.href)) {
+    try { var p = navigator.serviceWorker.register("sw.js"); if (p && p.catch) p.catch(function () {}); } catch (e) {}
+  }
+})();
+</script>
+</body>
+</html>
