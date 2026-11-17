@@ -1,5 +1,5 @@
 /* Caches the app so it opens and works with no internet. Bump CACHE when the files change. */
-var CACHE = "park-sign-log-v3";
+var CACHE = "park-sign-log-v4";
 var FILES = ["./", "index.html", "jspdf.min.js", "manifest.webmanifest", "icons/icon-192.png", "icons/icon-512.png", "icons/apple-touch-icon.png"];
 
 self.addEventListener("install", function (e) {
